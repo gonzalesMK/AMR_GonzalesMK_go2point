@@ -5,28 +5,44 @@
 #include <tf/tf.h>
 #include <geometry_msgs/Twist.h>
 
-double yaw,y,x,teta;
+double yaw,yi,xi,teta, delta,xf,yf;
 geometry_msgs::Twist vel;
 ros::Publisher  pub;
+
+double norma_ang( double ang )
+{   if  ( ang >  M_PI) {
+        ang -= 2 * M_PI; 
+    }
+    else if ( ang < - M_PI){
+        ang += 2 * M_PI;
+    }
+    return ang;
+}
 
 void callback(const nav_msgs::OdometryConstPtr& pos) {
       geometry_msgs::Quaternion qt;  
       qt = pos ->pose.pose.orientation ;
       yaw = tf::getYaw(qt);
-      y = pos->pose.pose.position.y;
-      x = pos->pose.pose.position.x;
-      teta = atan2((1.5 - y) , ( -3 - x))  ;
+      yi = pos->pose.pose.position.y;
+      xi = pos->pose.pose.position.x;
+      teta = atan2((yf - yi) , ( xf - xi));
+      delta = norma_ang( (teta-yaw) );
       
-    if ( abs(teta - yaw) > 3.14 ) {
-         
-        
-    } 
-    
-      pub.publish(vel);
-      std:: cout << teta << "   " << yaw << std::endl;
+      if ( fabs(delta) > 0.2 ){
+        vel.angular.z = delta * 3;
+        vel.linear.x =(M_PI - fabs(delta))*0.4 ;
+      } else {
+        vel.angular.z = delta*2 ;
+        vel.linear.x = 3;
+     }
+     pub.publish(vel);
 }
 
-    
+void Endback(const nav_msgs::OdometryConstPtr& posi){
+    yf = posi->pose.pose.position.y;
+    xf = posi->pose.pose.position.x;
+}
+
     int main(int argc, char **argv)
 {  
     ros::init(argc,argv, "Go2Point");
@@ -34,6 +50,7 @@ void callback(const nav_msgs::OdometryConstPtr& pos) {
     
     pub = node.advertise<geometry_msgs::Twist>("/position_control", 1);
     ros::Subscriber position = node.subscribe("/vrep/vehicle/odometry", 1, callback);
+    ros::Subscriber end = node.subscribe("/vrep/vehicle/End", 1, Endback);    
     
     ros::spin();
     
